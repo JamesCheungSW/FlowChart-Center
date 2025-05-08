@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>江门市安全应急智慧平台</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.0/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #0a1d3f;
+            color: white;
+            font-family: "Microsoft YaHei";
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .title {
+            text-align: center;
+            font-size: 36px;
+            margin-bottom: 15px;
+            letter-spacing: 4px;
+            position: relative;
+            padding-bottom: 15px;
+        }
+
+        .title::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            bottom: 0;
+            transform: translateX(-50%);
+            width: 98%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent 0%, #1a5cad 50%, transparent 100%);
+        }
+
+        .container {
+            display: flex;
+            flex: 1;
+            height: calc(100vh - 120px);
+            gap: 10px;
+        }
+
+        .left-panel {
+            width: 20%;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .center-panel {
+            width: 60%;
+            height: 100%;
+            padding: 10px;
+        }
+
+        .right-panel {
+            width: 20%;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        #map-container {
+            width: 100%;
+            height: 100%;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .module-box {
+            background: rgba(12, 45, 85, 0.8);
+            border: 1px solid #1a5cad;
+            border-radius: 5px;
+            padding: 15px;
+        }
+
+        .list-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: rgba(25, 65, 115, 0.6);
+            cursor: pointer;
+            transition: all 0.3s;
+            border-radius: 3px;
+        }
+
+        .list-item:hover {
+            background: #1a5cad;
+            transform: translateX(5px);
+        }
+
+        .detail-item {
+            padding: 10px;
+            margin: 8px 0;
+            background: rgba(25, 65, 115, 0.6);
+            border-radius: 3px;
+            line-height: 1.5;
+        }
+
+        /* 新增样式，让应急管理模块标题居中并添加分割线 */
+        .left-panel .module-box h3,
+        .right-panel .module-box h3 {
+            text-align: center;
+            position: relative;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        .left-panel .module-box h3::after,
+        .right-panel .module-box h3::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            bottom: 0;
+            transform: translateX(-50%);
+            width: 90%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent 0%, #1a5cad 50%, transparent 100%);
+        }
+
+        /* 弹窗样式 */
+        .popup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(12, 45, 85, 0.9);
+            border: 1px solid #1a5cad;
+            border-radius: 5px;
+            padding: 20px;
+            width: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+
+        .popup h3 {
+            margin-top: 0;
+        }
+
+        .popup-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="title">江门市安全应急智慧平台</div>
+    <div class="container">
+        <!-- 左侧功能面板 -->
+        <div class="left-panel">
+            <div class="module-box">
+                <h3>应急管理</h3>
+                <div class="list-item" data-type="station">应急服务站</div>
+                <div class="list-item" data-type="team">专职应急队伍</div>
+                <div class="list-item" data-type="fire">专职消防队</div>
+            </div>
+            <div class="module-box">
+                <h3>安全生产</h3>
+                <div class="list-item">全市企业类型及风险</div>
+                <div class="list-item">执行检查</div>
+            </div>
+        </div>
+
+        <!-- 中间地图区域 -->
+        <div class="center-panel">
+            <div id="map-container"></div>
+        </div>
+
+        <!-- 右侧功能面板 -->
+        <div class="right-panel">
+            <div class="module-box">
+                <h3>消防安全</h3>
+                <div class="list-item">消防安全常识</div>
+                <div class="list-item">自救基本知识</div>
+            </div>
+            <div class="module-box">
+                <h3>政企互动</h3>
+                <div class="list-item">安全应急知识</div>
+                <div class="list-item">安全法律法规</div>
+                <div class="list-item">连线专家</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 弹窗 -->
+    <div class="popup" id="popup">
+        <span class="popup-close" onclick="closePopup()">&times;</span>
+        <h3 id="popup-title"></h3>
+        <div id="popup-content"></div>
+    </div>
+
+    <script>
+        // 初始化地图
+        var myChart = echarts.init(document.getElementById('map-container'));
+
+        // 模拟数据集，增加记录数到5 - 6条
+        var dataSet = {
+            station: {
+                color: '#ff0000',
+                data: [
+                    { name: '蓬江服务站', value: [113.078, 22.595], info: '地址：蓬江区XX路<br>负责人：张三<br>电话：13800138000', area: '蓬江区' },
+                    { name: '新会服务站', value: [113.038, 22.458], info: '地址：新会区XX路<br>负责人：李四<br>电话：13800138001', area: '新会区' },
+                    { name: '台山服务站', value: [112.793, 22.252], info: '地址：台山市XX镇<br>负责人：王五<br>电话：13800138002', area: '台山市' },
+                    { name: '鹤山服务站', value: [112.964, 22.765], info: '地址：鹤山市XX街<br>负责人：赵六<br>电话：13800138003', area: '鹤山市' },
+                    { name: '开平服务站', value: [112.692, 22.376], info: '地址：开平市XX路<br>负责人：孙七<br>电话：13800138004', area: '开平市' }
+                ]
+            },
+            team: {
+                color: '#00a8ff',
+                data: [
+                    { name: '蓬江应急队', value: [113.082, 22.602], info: '队伍：防汛应急队<br>人数：15人<br>装备：冲锋舟3艘', area: '蓬江区' },
+                    { name: '江海应急队', value: [113.105, 22.565], info: '队伍：森林消防队<br>人数：20人<br>装备：消防车2辆', area: '江海区' },
+                    { name: '鹤山应急队', value: [112.964, 22.765], info: '队伍：医疗救援队<br>人数：10人<br>装备：救护车3辆', area: '鹤山市' },
+                    { name: '新会应急队', value: [113.032, 22.462], info: '队伍：地震救援队<br>人数：18人<br>装备：生命探测仪2台', area: '新会区' },
+                    { name: '台山应急队', value: [112.793, 22.252], info: '队伍：综合应急队<br>人数：22人<br>装备：无人机1架', area: '台山市' },
+                    { name: '开平应急队', value: [112.692, 22.376], info: '队伍：水上救援队<br>人数：16人<br>装备：橡皮艇4艘', area: '开平市' }
+                ]
+            },
+            fire: {
+                color: '#00ff00',
+                data: [
+                    { name: '新会消防队', value: [113.032, 22.462], info: '驻地：新会区XX大道<br>人数：25人<br>消防车：4辆', area: '新会区' },
+                    { name: '开平消防队', value: [112.692, 22.376], info: '驻地：开平市XX路<br>人数：18人<br>云梯车：1辆', area: '开平市' },
+                    { name: '恩平消防队', value: [112.305, 22.183], info: '驻地：恩平市XX镇<br>人数：15人<br>水罐车：2辆', area: '恩平市' },
+                    { name: '蓬江消防队', value: [113.078, 22.595], info: '驻地：蓬江区XX街<br>人数：20人<br>泡沫车：1辆', area: '蓬江区' },
+                    { name: '江海消防队', value: [113.105, 22.565], info: '驻地：江海区XX路<br>人数：17人<br>登高平台车：1辆', area: '江海区' }
+                ]
+            }
+        };
+
+        // 地图配置
+        var option = {
+            backgroundColor: 'transparent',
+            geo: {
+                map: 'jiangmen',
+                roam: true,
+                label: {
+                    show: true,
+                    color: '#fff',
+                    fontSize: 16, // 增大县区名字字体大小
+                    fontWeight: 'bold' // 加粗县区名字字体
+                },
+                itemStyle: {
+                    areaColor: '#124980',
+                    borderColor: '#00ffff', // 更明显的分界线颜色
+                    borderWidth: 2 // 增加分界线宽度
+                },
+                emphasis: {
+                    itemStyle: {
+                        areaColor: '#1a5cad',
+                        borderColor: '#00ffff', // 更明显的分界线颜色
+                        borderWidth: 2 // 增加分界线宽度
+                    }
+                },
+                zoom: 1.3 // 设置地图初始缩放比例为130%
+            }
+        };
+
+        // 加载地图数据
+        $.get('https://geo.datav.aliyun.com/areas_v3/bound/440700_full.json', function (geoJson) {
+            echarts.registerMap('jiangmen', geoJson);
+            myChart.setOption(option);
+
+            // 初始化时默认点击应急服务站
+            $('.list-item[data-type="station"]').click();
+        });
+
+        // 点击事件处理
+        $('.list-item[data-type]').click(function () {
+            // 移除所有 list-item 的 active 类
+            $('.list-item').removeClass('active');
+            // 添加 active 类到当前点击的 list-item
+            $(this).addClass('active');
+
+            var type = $(this).data('type');
+            var data = dataSet[type];
+
+            // 更新地图标记
+            myChart.setOption({
+                series: [{
+                    type: 'scatter',
+                    coordinateSystem: 'geo',
+                    data: data.data,
+                    symbolSize: 18,
+                    itemStyle: {
+                        color: data.color
+                    },
+                    label: {
+                        show: true,
+                        formatter: '{b}',
+                        color: '#fff',
+                        fontSize: 12
+                    },
+                    emphasis: {
+                        itemStyle: {
+                            color: data.color,
+                            borderColor: '#fff',
+                            borderWidth: 2
+                        }
+                    }
+                }]
+            });
+        });
+
+        // 点击地图区域显示弹窗
+        myChart.on('click', function (params) {
+            if (params.seriesType === 'scatter') {
+                var selectedType = $('.list-item.active').data('type') || 'station';
+                $('#popup-title').text(`${params.name} ${$('.list-item[data-type="' + selectedType + '"]').text()} 明细`);
+                $('#popup-content').html(`<div class="detail-item">${params.data.info}</div>`);
+                $('#popup').show();
+            } else if (params.componentType === 'geo') {
+                var selectedType = $('.list-item.active').data('type') || 'station';
+                var areaName = params.name;
+                var areaData = dataSet[selectedType].data.filter(item => item.area === areaName);
+                if (areaData.length > 0) {
+                    $('#popup-title').text(`${areaName} ${$('.list-item[data-type="' + selectedType + '"]').text()} 明细`);
+                    var content = '';
+                    areaData.forEach(item => {
+                        content += `<div class="detail-item">${item.name}<br>${item.info}</div>`;
+                    });
+                    $('#popup-content').html(content);
+                    $('#popup').show();
+                }
+            }
+        });
+
+        // 关闭弹窗
+        function closePopup() {
+            $('#popup').hide();
+        }
+    </script>
+</body>
+
+</html>
